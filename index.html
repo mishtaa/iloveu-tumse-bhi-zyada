@@ -407,6 +407,9 @@ footer{text-align:center;padding:48px 40px;border-top:1px solid var(--gb)}
   <button class="mp-fab" onclick="mpTogglePanel()">&#9835;</button>
 </div>
 <div id="yt-wrap"><div id="yt-player"></div></div>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>﻿var ANN=new Date('2025-06-26T00:00:00+05:30');
 var gd=document.getElementById('gd');
 var timerMode='together',lbIdx=0,curSong=-1,curMood='all';
@@ -549,13 +552,58 @@ function renderSongs(list){
 function filter(m,btn){curMood=m;curSong=-1;document.querySelectorAll('.mc').forEach(function(c){c.classList.remove('active');});btn.classList.add('active');renderSongs(getFilt());}
 function shuffle(){var list=getFilt().slice();for(var i=list.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=list[i];list[i]=list[j];list[j]=t;}curSong=-1;renderSongs(list);}
 
-var NK='tm_notes_v1';
-function getNotes(){try{return JSON.parse(localStorage.getItem(NK)||'[]');}catch(e){return[];}}
-function saveNotes(a){localStorage.setItem(NK,JSON.stringify(a));}
-function saveNote(){var txt=document.getElementById('noteText').value.trim();var name=document.getElementById('noteName').value.trim()||'Tarun';if(!txt)return;var notes=getNotes();notes.unshift({id:Date.now(),text:txt,from:name,date:new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})});saveNotes(notes);document.getElementById('noteText').value='';renderNotes();}
-function deleteNote(id){saveNotes(getNotes().filter(function(n){return n.id!==id;}));renderNotes();}
-function renderNotes(){var grid=document.getElementById('notesGrid');var notes=getNotes();if(!notes.length){grid.innerHTML='<div class="notes-empty">No notes yet \u2014 write the first one \u2665</div>';return;}grid.innerHTML='';notes.forEach(function(n){var c=document.createElement('div');c.className='note-card';c.innerHTML='<div class="note-text">'+escHtml(n.text)+'</div><div class="note-meta"><span class="note-from">from '+escHtml(n.from)+'</span><span class="note-date">'+n.date+'</span><button class="note-del" onclick="deleteNote('+n.id+')">&#x2715;</button></div>';grid.appendChild(c);});}
+firebase.initializeApp({
+  apiKey:"AIzaSyD6pU8zipWvAb5wNvRIXronQ14NBHeKWo4",
+  authDomain:"tarun-mishtee.firebaseapp.com",
+  projectId:"tarun-mishtee",
+  storageBucket:"tarun-mishtee.firebasestorage.app",
+  messagingSenderId:"1049942132118",
+  appId:"1:1049942132118:web:808386c05f8737cb3d49b7"
+});
+var db=firebase.firestore();
+var notesCol=db.collection('love_notes');
+
+function saveNote(){
+  var txt=document.getElementById('noteText').value.trim();
+  var name=document.getElementById('noteName').value.trim()||'Tarun';
+  if(!txt)return;
+  var btn=document.querySelector('.notes-save');
+  btn.disabled=true;
+  notesCol.add({
+    text:txt,
+    from:name,
+    date:new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}),
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    document.getElementById('noteText').value='';
+    btn.disabled=false;
+  }).catch(function(e){
+    console.error(e);
+    btn.disabled=false;
+  });
+}
+
+function deleteNote(id){
+  notesCol.doc(id).delete();
+}
+
 function escHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>');}
+
+notesCol.orderBy('createdAt','desc').onSnapshot(function(snapshot){
+  var grid=document.getElementById('notesGrid');
+  if(snapshot.empty){
+    grid.innerHTML='<div class="notes-empty">No notes yet \u2014 write the first one \u2665</div>';
+    return;
+  }
+  grid.innerHTML='';
+  snapshot.forEach(function(doc){
+    var n=doc.data();
+    var c=document.createElement('div');c.className='note-card';
+    c.innerHTML='<div class="note-text">'+escHtml(n.text||'')+'</div><div class="note-meta"><span class="note-from">from '+escHtml(n.from||'')+'</span><span class="note-date">'+(n.date||'')+'</span><button class="note-del" onclick="deleteNote(\''+doc.id+'\')">&times;</button></div>';
+    grid.appendChild(c);
+  });
+},function(err){console.error('Notes error:',err);});
+
 document.getElementById('noteText').addEventListener('keydown',function(e){if(e.ctrlKey&&e.key==='Enter')saveNote();});
 
 var obs=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:.08,rootMargin:'0px 0px -50px 0px'});
@@ -565,7 +613,7 @@ document.querySelectorAll('.reveal,.tli,.gi').forEach(function(el){obs.observe(e
 
 initSplashParticles();
 renderSongs(songs);
-renderNotes();
+// Notes are now loaded via Firestore real-time listener above
 </script>
 </body>
 </html>
