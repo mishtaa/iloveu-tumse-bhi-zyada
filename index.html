@@ -413,7 +413,7 @@ footer{text-align:center;padding:48px 40px;border-top:1px solid var(--gb)}
 <script>﻿var ANN=new Date('2025-06-26T00:00:00+05:30');
 var gd=document.getElementById('gd');
 var timerMode='together',lbIdx=0,curSong=-1,curMood='all';
-var mpOpen=false,mpPlaying=false,mpCur=0;
+var mpOpen=false,mpPlaying=false,mpCur=0,pendingPlay=false;
 var ytPlayer=null,ytReady=false;
 var gData=[
   {src:'photos/photo4.jpg',title:'First of Many Garba',note:'June 26 2025 - I still remember how excited you were to go. The world felt smaller, warmer - and us, inevitable.'},
@@ -460,10 +460,14 @@ function dismissSplash(){
   if(sp.classList.contains('hidden'))return;
   sp.classList.add('hidden');
   launchConfetti();
-  setTimeout(function(){
-    if(ytReady&&ytPlayer){ytPlayer.setVolume(72);ytPlayer.playVideo();mpPlaying=true;mpUpdateUI();setTimeout(function(){mpOpen=true;document.getElementById('mpPanel').classList.add('open');},800);}
-    else{setTimeout(arguments.callee,400);}
-  },900);
+  // Play immediately inside the user gesture (browsers require this for autoplay)
+  if(ytReady&&ytPlayer){
+    ytPlayer.setVolume(72);ytPlayer.playVideo();mpPlaying=true;mpUpdateUI();
+  } else {
+    pendingPlay=true; // YT not ready yet - will auto-start when it's ready
+  }
+  // Open the music panel after a short delay
+  setTimeout(function(){mpOpen=true;document.getElementById('mpPanel').classList.add('open');},1200);
 }
 document.getElementById('splash').addEventListener('click',dismissSplash);
 
@@ -472,7 +476,11 @@ function onYouTubeIframeAPIReady(){
     height:'1',width:'1',videoId:mpSongs[0].id,
     playerVars:{autoplay:0,controls:0,disablekb:1,fs:0,rel:0},
     events:{
-      onReady:function(e){ytReady=true;e.target.setVolume(72);},
+      onReady:function(e){
+        ytReady=true;e.target.setVolume(72);
+        // If user already tapped splash before YT was ready, start playing now
+        if(pendingPlay){pendingPlay=false;ytPlayer.playVideo();mpPlaying=true;mpUpdateUI();}
+      },
       onStateChange:function(e){if(e.data===0){mpCur=(mpCur+1)%mpSongs.length;ytPlayer.loadVideoById(mpSongs[mpCur].id);if(mpPlaying)ytPlayer.playVideo();mpUpdateUI();}}
     }
   });
